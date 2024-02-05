@@ -61,6 +61,14 @@ class NClient {
     console.log(`n is installed: ${stdout}`);
     return true;
   }
+
+  deleteVersion(version: string): boolean {
+    const { status, stderr, stdout } = this.runCommand(`rm ${version}`);
+
+    console.log(`deleteVersion: stdout: ${stdout};; stderr: ${stderr}`);
+
+    return status === 0;
+  }
 }
 
 const nClient = new NClient(preferences.path, preferences.directory);

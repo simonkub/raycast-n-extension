@@ -32,6 +32,24 @@ export default function Command() {
     return version == activeVersion ? Icon.CheckCircle : Icon.Circle;
   }
 
+  async function deleteVersion(version: string) {
+    const toast = await showToast(Style.Animated, `Deleting version ${version}`, "Hang on…");
+    const success = nClient.deleteVersion(version);
+
+    if (success) {
+      toast.title = `Deleted Version ${version}`;
+      toast.message = undefined;
+      toast.style = Style.Success;
+
+      setVersions(nClient.getLocalVersions());
+      setActiveVersion(nClient.getActiveVersion());
+    } else {
+      toast.title = `Deleting Version ${version} failed`;
+      toast.message = undefined;
+      toast.style = Style.Failure;
+    }
+  }
+
   return (
     <List isLoading={versions == undefined}>
       {versions?.map((version) => {
@@ -43,6 +61,7 @@ export default function Command() {
             actions={
               <ActionPanel>
                 <Action title="Activate Version" icon={Icon.CheckCircle} onAction={() => activateVersion(version)} />
+                <Action title="Delete Version" icon={Icon.Trash} onAction={() => deleteVersion(version)} />
               </ActionPanel>
             }
           />
