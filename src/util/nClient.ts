@@ -1,6 +1,16 @@
-import { spawnSync } from "node:child_process";
+import { exec, spawnSync } from "node:child_process";
 import { preferences } from "./preferences";
 import * as os from "os";
+import * as util from "util";
+
+export type Versions = { [key: string]: VersionInformation };
+export type VersionInformation = { version: string; type: VersionSource };
+export enum VersionSource {
+  Local = "local",
+  Network = "network",
+}
+
+const execAsync = util.promisify(exec);
 
 class NClient {
   public readonly isInstalled: boolean;
@@ -16,26 +26,47 @@ class NClient {
     this.isInstalled = this.isNInstalled();
   }
 
-  getLocalVersions() {
-    const { stdout } = this.runCommand("ls");
-    const localVersions = stdout.toString().trim().replaceAll("node/", "").split(os.EOL);
+  async getLocalVersions(): Promise<Versions> {
+    const { stdout, stderr } = await execAsync(`${this.nPath} ls`);
 
-    console.log(`getLocalVersions: ${localVersions}`);
+    const localVersions = stdout
+      .toString()
+      .trim()
+      .replaceAll("node/", "")
+      .split(os.EOL)
+      .reverse()
+      .map((version): VersionInformation => {
+        return { version, type: VersionSource.Local };
+      })
+      .reduce((acc: Versions, version) => {
+        acc[version.version] = version;
+        return acc;
+      }, {});
+
+    console.log(`getLocalVersions: ${JSON.stringify(localVersions)};; stdout: ${stdout};; stderr: ${stderr}`);
 
     return localVersions;
   }
 
-  setActiveVersion(version: string): boolean {
-    const { status } = this.runCommand(version);
+  async activateOrDownloadVersion(version: string): Promise<boolean> {
+    const { stdout, stderr } = await execAsync(`${this.nPath} ${version}`);
 
-    return status === 0;
+    console.log(`setActiveVersion: stdout: ${stdout};; stderr: ${stderr}`);
+
+    if (stderr.length === 0) {
+      return true;
+    } else if (stderr == "tar: Failed to set default locale\n") {
+      return true;
+    } else {
+      return false;
+    }
   }
 
-  getActiveVersion(): string | undefined {
+  async getActiveVersion(): Promise<string | undefined> {
     const nodeExecutable = `${this.nDirectory}/bin/node`;
-    const { stdout, status } = spawnSync(`${nodeExecutable} --version`, { shell: true });
+    const { stdout, stderr } = await execAsync(`${nodeExecutable} --version`);
 
-    if (status === 0) {
+    if (stderr.length === 0) {
       // vXX.YY.ZZ\n
       const activeVersion = stdout.toString().replace("v", "").trim();
       console.log(`getActiveVersion: ${activeVersion}`);
@@ -45,13 +76,8 @@ class NClient {
     }
   }
 
-  private runCommand(command: string) {
-    const { stdout, stderr, error, status } = spawnSync(`${this.nPath} ${command}`, { shell: true });
-    return { stdout, stderr, error, status };
-  }
-
   private isNInstalled() {
-    const { stdout, stderr } = this.runCommand("--version");
+    const { stdout, stderr } = spawnSync(`${this.nPath} --version`, { shell: true });
 
     if (stdout.length === 0) {
       console.error(`n is not installed: ${stderr}`);
@@ -62,12 +88,28 @@ class NClient {
     return true;
   }
 
-  deleteVersion(version: string): boolean {
-    const { status, stderr, stdout } = this.runCommand(`rm ${version}`);
+  async deleteVersion(version: string): Promise<boolean> {
+    const { stdout, stderr } = await execAsync(`${this.nPath} rm ${version}`);
 
     console.log(`deleteVersion: stdout: ${stdout};; stderr: ${stderr}`);
 
-    return status === 0;
+    return stderr.length === 0;
+  }
+
+  async getAvailableVersions(): Promise<Versions> {
+    const { stdout, stderr } = await execAsync(`${this.nPath} lsr --all`);
+    console.log(`getAvailableVersions: stdout: ${stdout};; stderr: ${stderr}`);
+
+    return stdout
+      .trim()
+      .split(os.EOL)
+      .map((version): VersionInformation => {
+        return { version, type: VersionSource.Network };
+      })
+      .reduce((acc: Versions, version) => {
+        acc[version.version] = version;
+        return acc;
+      }, {});
   }
 }
 
