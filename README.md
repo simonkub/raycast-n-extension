@@ -1,6 +1,6 @@
 # n Node Version Management
 
-Support for managing node versions with n
+Support for managing node versions with n (https://github.com/tj/n)
 
 ## Setup
 
