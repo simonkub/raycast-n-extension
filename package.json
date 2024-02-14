@@ -12,8 +12,8 @@
   "commands": [
     {
       "name": "list",
-      "title": "Search installed versions",
-      "subtitle": "N – Node Version Manager",
+      "title": "Manage Node.js Versions",
+      "subtitle": "n – Node Version Manager",
       "description": "List node.js versions on your machine",
       "mode": "view"
     }
