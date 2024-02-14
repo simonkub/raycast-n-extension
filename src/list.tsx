@@ -1,39 +1,22 @@
-import { Action, ActionPanel, Icon, List, showToast, Toast } from "@raycast/api";
-import { nClient, VersionInformation, Versions, VersionSource } from "./util/nClient";
+import { List, showToast, Toast } from "@raycast/api";
+import { nClient, Versions } from "./util/nClient";
 import { useEffect, useState } from "react";
+import { VersionSourceDropdown, VersionSourceDropdownValue } from "./components/VersionSourceDropdown";
+import { VersionListItem } from "./components/VersionListItem";
 import Style = Toast.Style;
 
-enum VersionSourceDropdownValue {
-  Installed = "installed",
-  All = "all",
-}
-
-function VersionSourceDropdown(props: {
-  filter: VersionSourceDropdownValue;
-  onFilterUpdated: (newValue: VersionSourceDropdownValue) => void;
-}) {
-  return (
-    <List.Dropdown
-      tooltip="Filter Versions"
-      value={props.filter}
-      onChange={(newValue) => {
-        props.onFilterUpdated(newValue as VersionSourceDropdownValue);
-      }}
-    >
-      <List.Dropdown.Item title="Installed" value={VersionSourceDropdownValue.Installed} />
-      <List.Dropdown.Item title="Installed and Available" value={VersionSourceDropdownValue.All} />
-    </List.Dropdown>
-  );
-}
-
 export default function Command() {
+  const [searchText, setSearchText] = useState("");
   const [isLoading, setIsLoading] = useState(true);
-  const [localVersions, setLocalVersions] = useState<Versions>({});
-  const [activeVersion, setActiveVersion] = useState<string | undefined>();
-  const [availableVersions, setAvailableVersions] = useState<Versions>({});
   const [versionSourceFilter, setVersionSourceFilter] = useState<VersionSourceDropdownValue>(
     VersionSourceDropdownValue.Installed,
   );
+
+  const [activeVersion, setActiveVersion] = useState<string | undefined>();
+  const [localVersions, setLocalVersions] = useState<Versions>({});
+  const [availableVersions, setAvailableVersions] = useState<Versions>({});
+
+  const versionListContent: Versions = Object.assign({}, availableVersions, { ...localVersions });
 
   useEffect(() => {
     loadActiveAndLocalVersions()
@@ -44,32 +27,18 @@ export default function Command() {
       });
   }, []);
 
-  useEffect(() => {
-    if (versionSourceFilter === VersionSourceDropdownValue.All) {
-      loadAvailableVersions().catch((e) => console.error(e));
-    } else {
-      setAvailableVersions({});
-    }
-  }, [versionSourceFilter]);
-
-  const versionInformation: Versions = Object.assign({}, availableVersions, { ...localVersions });
-
-  async function loadAvailableVersions() {
-    const availableVersions = await nClient.getAvailableVersions();
-    setAvailableVersions(availableVersions);
-  }
-
   async function loadActiveAndLocalVersions() {
     const localVersionsPromise = nClient.getLocalVersions();
     const activeVersionPromise = nClient.getActiveVersion();
 
     const [localVersions, activeVersion] = await Promise.all([localVersionsPromise, activeVersionPromise]);
 
+    console.log(`localVersions: ${JSON.stringify(localVersions)};; activeVersion: ${activeVersion}`);
     setLocalVersions(localVersions);
     setActiveVersion(activeVersion);
   }
 
-  async function activateVersion(version: string) {
+  async function onActivateVersionClick(version: string) {
     const toast = await showToast(Style.Animated, `Activating version ${version}`, "Hang on…");
     const success = await nClient.activateOrDownloadVersion(version);
 
@@ -85,20 +54,7 @@ export default function Command() {
     }
   }
 
-  function getVersionIcon(version: VersionInformation): Icon {
-    if (version.version === activeVersion) {
-      return Icon.CheckCircle;
-    }
-
-    switch (version.type) {
-      case VersionSource.Local:
-        return Icon.Circle;
-      case VersionSource.Network:
-        return Icon.Download;
-    }
-  }
-
-  async function deleteVersion(version: string) {
+  async function onDeleteVersionClick(version: string) {
     const toast = await showToast(Style.Animated, `Deleting version ${version}`, "Hang on…");
     const success = await nClient.deleteVersion(version);
 
@@ -115,7 +71,7 @@ export default function Command() {
     }
   }
 
-  async function downloadAndActivateVersion(version: string) {
+  async function onDownloadAndActivateVersionClick(version: string) {
     const toast = await showToast(Style.Animated, `Downloading version ${version}`, "Hang on…");
     const success = await nClient.activateOrDownloadVersion(version);
 
@@ -132,45 +88,64 @@ export default function Command() {
     }
   }
 
+  async function onSearchBarFilterUpdated(versionSourceFilter: VersionSourceDropdownValue) {
+    setVersionSourceFilter(versionSourceFilter);
+    setSearchText("");
+
+    if (versionSourceFilter === VersionSourceDropdownValue.All) {
+      const availableVersions = await nClient.getAvailableVersions();
+      setAvailableVersions(availableVersions);
+    } else {
+      setAvailableVersions({});
+    }
+  }
+
+  if (!isLoading && Object.keys(versionListContent).length === 0) {
+    return (
+      <List
+        filtering={true}
+        searchText={searchText}
+        onSearchTextChange={(search) => {
+          setSearchText(search);
+        }}
+        searchBarAccessory={
+          <VersionSourceDropdown
+            filter={versionSourceFilter}
+            onFilterUpdated={(newValue: VersionSourceDropdownValue) => onSearchBarFilterUpdated(newValue)}
+          />
+        }
+      >
+        {versionSourceFilter === VersionSourceDropdownValue.Installed ? (
+          <List.Item title="No installed node versions found" />
+        ) : (
+          <List.Item title="No installed or remote node versions found" />
+        )}
+      </List>
+    );
+  }
+
   return (
     <List
+      filtering={true}
+      searchText={searchText}
+      onSearchTextChange={(search) => setSearchText(search)}
       isLoading={isLoading}
       searchBarAccessory={
         <VersionSourceDropdown
           filter={versionSourceFilter}
-          onFilterUpdated={(newValue) => setVersionSourceFilter(newValue)}
+          onFilterUpdated={(newValue) => onSearchBarFilterUpdated(newValue)}
         />
       }
     >
-      {Object.keys(versionInformation).map((key) => {
-        const version = versionInformation[key];
-        return (
-          <List.Item
-            key={version.version}
-            title={version.version}
-            icon={getVersionIcon(version)}
-            actions={
-              <ActionPanel>
-                {version.type == VersionSource.Local && (
-                  <>
-                    <Action
-                      title="Activate Version"
-                      icon={Icon.CheckCircle}
-                      onAction={() => activateVersion(version.version)}
-                    />
-                    <Action title="Delete Version" icon={Icon.Trash} onAction={() => deleteVersion(version.version)} />
-                  </>
-                )}
-                {version.type == VersionSource.Network && (
-                  <Action
-                    title="Download and Activate Version"
-                    icon={Icon.Download}
-                    onAction={() => downloadAndActivateVersion(version.version)}
-                  />
-                )}
-              </ActionPanel>
-            }
-          />
+      {Object.keys(versionListContent).map((key) => {
+        const version = versionListContent[key];
+
+        return VersionListItem(
+          version,
+          version.version == activeVersion,
+          (version) => onActivateVersionClick(version),
+          (version) => onDeleteVersionClick(version),
+          (version) => onDownloadAndActivateVersionClick(version),
         );
       })}
     </List>

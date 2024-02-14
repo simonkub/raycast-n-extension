@@ -1,16 +1,16 @@
-import { exec, spawnSync } from "node:child_process";
+import { spawnSync } from "node:child_process";
 import { preferences } from "./preferences";
 import * as os from "os";
-import * as util from "util";
+import { execAsync } from "./execAsync";
 
-export type Versions = { [key: string]: VersionInformation };
-export type VersionInformation = { version: string; type: VersionSource };
 export enum VersionSource {
   Local = "local",
   Network = "network",
 }
 
-const execAsync = util.promisify(exec);
+export type Versions = { [key: string]: VersionInformation };
+
+export type VersionInformation = { version: string; type: VersionSource };
 
 class NClient {
   public readonly isInstalled: boolean;
@@ -28,6 +28,11 @@ class NClient {
 
   async getLocalVersions(): Promise<Versions> {
     const { stdout, stderr } = await execAsync(`${this.nPath} ls`);
+
+    if (stdout.toString().length == 0) {
+      console.log("No local versions found.xxx");
+      return {};
+    }
 
     const localVersions = stdout
       .toString()
