@@ -52,7 +52,7 @@ export default function Command() {
     }
   }, [versionSourceFilter]);
 
-  const versionInformation: Versions = Object.assign(availableVersions, { ...localVersions });
+  const versionInformation: Versions = Object.assign({}, availableVersions, { ...localVersions });
 
   async function loadAvailableVersions() {
     const availableVersions = await nClient.getAvailableVersions();
