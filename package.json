@@ -1,7 +1,7 @@
 {
   "$schema": "https://www.raycast.com/schemas/extension.json",
   "name": "n-node-version-management",
-  "title": "n - Node Version Management",
+  "title": "N - Node Version Management",
   "description": "Support for managing node versions with n",
   "icon": "command-icon.png",
   "author": "simonkub",
@@ -13,7 +13,7 @@
     {
       "name": "list",
       "title": "Manage Node.js Versions",
-      "subtitle": "n – Node Version Manager",
+      "subtitle": "N – Node Version Manager",
       "description": "List node.js versions on your machine",
       "mode": "view"
     }
